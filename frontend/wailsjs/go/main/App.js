@@ -14,6 +14,10 @@ export function GetRequestByID(arg1) {
   return window['go']['main']['App']['GetRequestByID'](arg1);
 }
 
+export function GetResponseByID(arg1) {
+  return window['go']['main']['App']['GetResponseByID'](arg1);
+}
+
 export function ParseCurlCommand(arg1) {
   return window['go']['main']['App']['ParseCurlCommand'](arg1);
 }

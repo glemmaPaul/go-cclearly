@@ -4,6 +4,7 @@
   import RequestPane from './components/RequestPane.svelte';
   import ResponsePane from './components/ResponsePane.svelte';
   import { ExecuteRequest, GetHistory, GetRequestByID, ParseCurlCommand } from '../wailsjs/go/main/App.js';
+  import { responseStore } from './stores/responseStore.js';
 
   // State management
   let selectedHistoryItem = null;
@@ -18,6 +19,9 @@
     body: '',
     headers: []
   };
+  
+  // Force reactivity trigger
+  let responseKey = 0;
 
   // History data
   let history = [];
@@ -68,25 +72,40 @@
       const response = await ExecuteRequest(backendRequest);
       console.log('Received response:', response);
       
-      // Convert backend response to frontend format
-      responseData = {
+      // Convert backend response to frontend format and force reactivity
+      const newResponseData = {
         status: response.statusCode,
-        body: response.body,
+        body: response.formattedBody || response.body || '',
+        formattedBody: response.formattedBody || response.body || '',
+        responseType: response.responseType || 'raw',
         headers: Object.entries(response.headers || {}).map(([key, value]) => ({ key, value }))
       };
       
-      console.log('Converted response data:', responseData);
-      console.log('Status code:', responseData.status);
+      // Update the store to trigger reactivity
+      responseStore.set(newResponseData);
+      
+      console.log('Converted response data:', newResponseData);
+      console.log('Status code:', newResponseData.status);
+      console.log('Response body length:', newResponseData.body?.length || 0);
+      console.log('Response headers count:', newResponseData.headers?.length || 0);
 
       // Reload history to show the new request
       await loadHistory();
+      
+      // Auto-select the newest item (first in the list)
+      if (history.length > 0) {
+        selectedHistoryItem = history[0].id;
+        console.log('Auto-selected new history item:', selectedHistoryItem);
+      }
     } catch (error) {
       console.error('Request failed:', error);
-      responseData = {
+      responseStore.set({
         status: 0,
         body: `Error: ${error.message}`,
+        formattedBody: `Error: ${error.message}`,
+        responseType: 'raw',
         headers: []
-      };
+      });
     } finally {
       loading = false;
     }
@@ -125,6 +144,32 @@
             body: parsedRequest.body
           };
           console.log('Updated request data from history:', requestData);
+        }
+
+        // Load and display the response data
+        if (historyItem.responseBody) {
+          console.log('Loading response data for history item');
+          const responseData = {
+            status: historyItem.statusCode,
+            body: historyItem.responseBody,
+            formattedBody: historyItem.responseBody,
+            responseType: historyItem.responseType || 'raw',
+            headers: []
+          };
+
+          // Parse headers if available
+          if (historyItem.responseHeaders) {
+            try {
+              const headersObj = JSON.parse(historyItem.responseHeaders);
+              responseData.headers = Object.entries(headersObj).map(([key, value]) => ({ key, value }));
+            } catch (error) {
+              console.error('Failed to parse response headers:', error);
+            }
+          }
+
+          // Update the response store
+          responseStore.set(responseData);
+          console.log('Response data loaded for history item:', responseData);
         }
       }
     } catch (error) {
@@ -179,11 +224,11 @@
   });
 </script>
 
-<main class="h-screen flex flex-col bg-gray-50">
+<main class="h-screen flex flex-col bg-gray-900">
   <Header onSendRequest={handleSendRequest} />
   
   <div class="flex-1 flex overflow-hidden">
-    <div class="w-1/4 bg-white border-r border-gray-200 flex flex-col">
+    <div class="w-1/4 bg-gray-800 border-r border-gray-700 flex flex-col">
       <HistoryPane 
         {history}
         {selectedHistoryItem}
@@ -192,27 +237,17 @@
     </div>
     
     <div class="flex-1 flex overflow-hidden">
-      <div class="w-1/2 bg-white border-r border-gray-200">
+      <div class="w-1/2 bg-gray-800 border-r border-gray-700">
         <RequestPane 
           {requestData}
           onRequestDataChange={handleRequestDataChange}
+          onSendRequest={handleSendRequest}
         />
       </div>
       
-      <div class="w-1/2 bg-white">
-        <ResponsePane {responseData} />
+      <div class="w-1/2 bg-gray-800">
+        <ResponsePane {loading} />
       </div>
     </div>
   </div>
-
-  {#if loading}
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div class="bg-white p-6 rounded-lg shadow-lg">
-        <div class="flex items-center space-x-3">
-          <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-          <span class="text-gray-700">Sending request...</span>
-        </div>
-      </div>
-    </div>
-  {/if}
 </main>

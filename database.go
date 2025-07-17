@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -36,6 +37,9 @@ func (d *Database) init() error {
 		url TEXT NOT NULL,
 		full_command TEXT NOT NULL,
 		status_code INTEGER,
+		response_body TEXT,
+		response_headers TEXT,
+		response_type TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 	`
@@ -46,19 +50,27 @@ func (d *Database) init() error {
 
 // SaveRequest saves a request to the history
 func (d *Database) SaveRequest(req RequestData, response *ResponseData, fullCommand string) error {
+	// Convert headers map to JSON string
+	headersJSON := "{}"
+	if response.Headers != nil {
+		if headersBytes, err := json.Marshal(response.Headers); err == nil {
+			headersJSON = string(headersBytes)
+		}
+	}
+
 	query := `
-	INSERT INTO history (method, url, full_command, status_code, created_at)
-	VALUES (?, ?, ?, ?, ?)
+	INSERT INTO history (method, url, full_command, status_code, response_body, response_headers, response_type, created_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	_, err := d.db.Exec(query, req.Method, req.URL, fullCommand, response.StatusCode, time.Now())
+	_, err := d.db.Exec(query, req.Method, req.URL, fullCommand, response.StatusCode, response.FormattedBody, headersJSON, response.ResponseType, time.Now())
 	return err
 }
 
 // GetHistory retrieves the request history
 func (d *Database) GetHistory(limit int) ([]HistoryItem, error) {
 	query := `
-	SELECT id, method, url, full_command, status_code, created_at
+	SELECT id, method, url, full_command, status_code, response_body, response_headers, response_type, created_at
 	FROM history
 	ORDER BY created_at DESC
 	LIMIT ?
@@ -73,7 +85,7 @@ func (d *Database) GetHistory(limit int) ([]HistoryItem, error) {
 	var history []HistoryItem
 	for rows.Next() {
 		var item HistoryItem
-		err := rows.Scan(&item.ID, &item.Method, &item.URL, &item.FullCommand, &item.StatusCode, &item.CreatedAt)
+		err := rows.Scan(&item.ID, &item.Method, &item.URL, &item.FullCommand, &item.StatusCode, &item.ResponseBody, &item.ResponseHeaders, &item.ResponseType, &item.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -86,13 +98,13 @@ func (d *Database) GetHistory(limit int) ([]HistoryItem, error) {
 // GetRequestByID retrieves a specific request by ID
 func (d *Database) GetRequestByID(id int64) (*HistoryItem, error) {
 	query := `
-	SELECT id, method, url, full_command, status_code, created_at
+	SELECT id, method, url, full_command, status_code, response_body, response_headers, response_type, created_at
 	FROM history
 	WHERE id = ?
 	`
 
 	var item HistoryItem
-	err := d.db.QueryRow(query, id).Scan(&item.ID, &item.Method, &item.URL, &item.FullCommand, &item.StatusCode, &item.CreatedAt)
+	err := d.db.QueryRow(query, id).Scan(&item.ID, &item.Method, &item.URL, &item.FullCommand, &item.StatusCode, &item.ResponseBody, &item.ResponseHeaders, &item.ResponseType, &item.CreatedAt)
 	if err != nil {
 		return nil, err
 	}

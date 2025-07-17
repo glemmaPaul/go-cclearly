@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -129,6 +130,9 @@ func (ce *CurlExecutor) buildCurlArgs(req RequestData) []string {
 		"-w", "\nHTTPSTATUS:%{http_code}\n", // Write status code with prefix
 		"-D", "-", // Dump headers to stdout
 		"--max-time", "30", // 30 second timeout
+		"--compressed",                  // Handle gzip/deflate compression automatically
+		"-H", "Cache-Control: no-cache", // Prevent caching
+		"-H", "Pragma: no-cache", // Prevent caching (HTTP/1.0)
 	}
 
 	// Add method
@@ -212,24 +216,31 @@ func (ce *CurlExecutor) parseCurlOutput(output string, response *ResponseData) {
 		}
 	}
 
-	// Extract response headers (they come before the body)
+	// Extract response headers and body
+	// Normalize line endings and split
+	output = strings.ReplaceAll(output, "\r\n", "\n")
+	output = strings.ReplaceAll(output, "\r", "\n")
 	lines := strings.Split(output, "\n")
 	var bodyLines []string
 	inBody := false
+	headerSectionEnded := false
 
 	for _, line := range lines {
 		if strings.HasPrefix(line, "HTTPSTATUS:") {
 			continue // Skip our status line
 		}
 
-		if line == "" && !inBody {
-			inBody = true
+		// Skip HTTP status line (e.g., "HTTP/2 200")
+		if strings.HasPrefix(strings.TrimSpace(line), "HTTP/") {
 			continue
 		}
 
-		if inBody {
-			bodyLines = append(bodyLines, line)
-		} else if strings.Contains(line, ":") {
+		// Check if this line looks like a header (contains colon and doesn't start with { or [)
+		isHeader := strings.Contains(line, ":") &&
+			!strings.HasPrefix(strings.TrimSpace(line), "{") &&
+			!strings.HasPrefix(strings.TrimSpace(line), "[")
+
+		if !headerSectionEnded && isHeader {
 			// This is a header line
 			parts := strings.SplitN(line, ":", 2)
 			if len(parts) == 2 {
@@ -237,12 +248,30 @@ func (ce *CurlExecutor) parseCurlOutput(output string, response *ResponseData) {
 				value := strings.TrimSpace(parts[1])
 				response.Headers[key] = value
 			}
+		} else if !headerSectionEnded && !isHeader && strings.TrimSpace(line) != "" {
+			// This is the start of the body (first non-header, non-empty line)
+			headerSectionEnded = true
+			inBody = true
+			bodyLines = append(bodyLines, line)
+		} else if inBody {
+			// We're in the body section
+			bodyLines = append(bodyLines, line)
 		}
 	}
 
 	// Update body with only the body content
 	if len(bodyLines) > 0 {
 		response.Body = strings.Join(bodyLines, "\n")
+	}
+
+	// Detect response type and format if needed
+	response.ResponseType = ce.detectResponseType(response.Headers, response.Body)
+
+	// Format JSON responses
+	if response.ResponseType == "json" {
+		response.FormattedBody = ce.formatJSON(response.Body)
+	} else {
+		response.FormattedBody = response.Body
 	}
 
 	// Extract timing information if available
@@ -259,4 +288,72 @@ func (ce *CurlExecutor) parseCurlOutput(output string, response *ResponseData) {
 			response.Timing.ConnectTime = timing
 		}
 	}
+}
+
+// detectResponseType determines the type of response based on content-type header and body content
+func (ce *CurlExecutor) detectResponseType(headers map[string]string, body string) string {
+	// Check content-type header first
+	if contentType, exists := headers["Content-Type"]; exists {
+		contentType = strings.ToLower(contentType)
+		if strings.Contains(contentType, "application/json") {
+			return "json"
+		}
+		if strings.Contains(contentType, "text/html") || strings.Contains(contentType, "application/xhtml") {
+			return "html"
+		}
+		if strings.Contains(contentType, "text/plain") {
+			return "raw"
+		}
+		if strings.Contains(contentType, "text/xml") || strings.Contains(contentType, "application/xml") {
+			return "raw"
+		}
+	}
+
+	// Fallback: analyze body content
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return "raw"
+	}
+
+	// Check if it looks like JSON
+	if (strings.HasPrefix(body, "{") && strings.HasSuffix(body, "}")) ||
+		(strings.HasPrefix(body, "[") && strings.HasSuffix(body, "]")) {
+		// Try to parse as JSON to confirm
+		var js json.RawMessage
+		if json.Unmarshal([]byte(body), &js) == nil {
+			return "json"
+		}
+	}
+
+	// Check if it looks like HTML
+	if strings.HasPrefix(body, "<!DOCTYPE") ||
+		strings.HasPrefix(body, "<html") ||
+		strings.HasPrefix(body, "<HTML") {
+		return "html"
+	}
+
+	// Default to raw
+	return "raw"
+}
+
+// formatJSON pretty-prints JSON if the response is valid JSON
+func (ce *CurlExecutor) formatJSON(body string) string {
+	if body == "" {
+		return ""
+	}
+
+	// Try to parse and format the JSON
+	var js interface{}
+	if err := json.Unmarshal([]byte(body), &js); err != nil {
+		// If it's not valid JSON, return the original body
+		return body
+	}
+
+	// Format the JSON with proper indentation
+	formatted, err := json.MarshalIndent(js, "", "  ")
+	if err != nil {
+		return body
+	}
+
+	return string(formatted)
 }

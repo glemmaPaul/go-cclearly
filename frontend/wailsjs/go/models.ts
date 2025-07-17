@@ -6,6 +6,11 @@ export namespace main {
 	    url: string;
 	    fullCommand: string;
 	    statusCode: number;
+	    responseBody?: string;
+	    responseHeaders?: string;
+	    responseType?: string;
+	    requestSize: number;
+	    responseSize: number;
 	    // Go type: time
 	    createdAt: any;
 	
@@ -20,6 +25,11 @@ export namespace main {
 	        this.url = source["url"];
 	        this.fullCommand = source["fullCommand"];
 	        this.statusCode = source["statusCode"];
+	        this.responseBody = source["responseBody"];
+	        this.responseHeaders = source["responseHeaders"];
+	        this.responseType = source["responseType"];
+	        this.requestSize = source["requestSize"];
+	        this.responseSize = source["responseSize"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	    }
 	
@@ -79,6 +89,8 @@ export namespace main {
 	    statusCode: number;
 	    headers: Record<string, string>;
 	    body: string;
+	    formattedBody?: string;
+	    responseType: string;
 	    timing: ResponseTiming;
 	    error?: string;
 	
@@ -91,6 +103,8 @@ export namespace main {
 	        this.statusCode = source["statusCode"];
 	        this.headers = source["headers"];
 	        this.body = source["body"];
+	        this.formattedBody = source["formattedBody"];
+	        this.responseType = source["responseType"];
 	        this.timing = this.convertValues(source["timing"], ResponseTiming);
 	        this.error = source["error"];
 	    }

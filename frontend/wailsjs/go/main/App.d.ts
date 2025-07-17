@@ -8,4 +8,6 @@ export function GetHistory(arg1:number):Promise<Array<main.HistoryItem>>;
 
 export function GetRequestByID(arg1:number):Promise<main.HistoryItem>;
 
+export function GetResponseByID(arg1:number):Promise<main.ResponseData>;
+
 export function ParseCurlCommand(arg1:string):Promise<main.RequestData>;

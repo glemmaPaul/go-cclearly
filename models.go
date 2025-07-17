@@ -12,11 +12,13 @@ type RequestData struct {
 
 // ResponseData represents the structure of an HTTP response
 type ResponseData struct {
-	StatusCode int               `json:"statusCode"`
-	Headers    map[string]string `json:"headers"`
-	Body       string            `json:"body"`
-	Timing     ResponseTiming    `json:"timing"`
-	Error      string            `json:"error,omitempty"`
+	StatusCode    int               `json:"statusCode"`
+	Headers       map[string]string `json:"headers"`
+	Body          string            `json:"body"`
+	FormattedBody string            `json:"formattedBody,omitempty"` // Pre-formatted body (e.g., pretty JSON)
+	ResponseType  string            `json:"responseType"`            // "json", "html", "raw"
+	Timing        ResponseTiming    `json:"timing"`
+	Error         string            `json:"error,omitempty"`
 }
 
 // ResponseTiming contains timing information for the request
@@ -28,12 +30,17 @@ type ResponseTiming struct {
 
 // HistoryItem represents a saved request in the database
 type HistoryItem struct {
-	ID          int64     `json:"id"`
-	Method      string    `json:"method"`
-	URL         string    `json:"url"`
-	FullCommand string    `json:"fullCommand"`
-	StatusCode  int       `json:"statusCode"`
-	CreatedAt   time.Time `json:"createdAt"`
+	ID              int64     `json:"id"`
+	Method          string    `json:"method"`
+	URL             string    `json:"url"`
+	FullCommand     string    `json:"fullCommand"`
+	StatusCode      int       `json:"statusCode"`
+	ResponseBody    string    `json:"responseBody,omitempty"`
+	ResponseHeaders string    `json:"responseHeaders,omitempty"`
+	ResponseType    string    `json:"responseType,omitempty"`
+	RequestSize     int64     `json:"requestSize"`  // Size of request payload in bytes
+	ResponseSize    int64     `json:"responseSize"` // Size of response body in bytes
+	CreatedAt       time.Time `json:"createdAt"`
 }
 
 // CurlCommand represents a parsed cURL command

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -90,6 +91,36 @@ func (a *App) GetRequestByID(id int64) (*HistoryItem, error) {
 	}
 
 	return a.database.GetRequestByID(id)
+}
+
+// GetResponseByID retrieves the response data for a specific history item
+func (a *App) GetResponseByID(id int64) (*ResponseData, error) {
+	if a.database == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+
+	item, err := a.database.GetRequestByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse headers from JSON string
+	headers := make(map[string]string)
+	if item.ResponseHeaders != "" {
+		if err := json.Unmarshal([]byte(item.ResponseHeaders), &headers); err != nil {
+			log.Printf("Failed to parse response headers: %v", err)
+		}
+	}
+
+	response := &ResponseData{
+		StatusCode:    item.StatusCode,
+		Headers:       headers,
+		Body:          item.ResponseBody,
+		FormattedBody: item.ResponseBody,
+		ResponseType:  item.ResponseType,
+	}
+
+	return response, nil
 }
 
 // buildCurlCommand builds a cURL command string from RequestData
