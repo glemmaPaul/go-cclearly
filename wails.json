@@ -9,5 +9,13 @@
   "author": {
     "name": "Paul Oostenrijk",
     "email": "paul@glemma.nl"
-  }
+  },
+  "info": {
+    "companyName": "Paul Oostenrijk",
+    "productName": "cclearly",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright © 2024 Paul Oostenrijk",
+    "comments": "A local-first cURL inspector app"
+  },
+  "icon": "icon.png"
 }

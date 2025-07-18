@@ -2,6 +2,7 @@
   export let history = [];
   export let selectedHistoryItem = null;
   export let onSelectHistoryItem;
+  export let databaseStatus = { connected: true, message: '' };
 
   function getMethodColor(method) {
     return 'bg-gray-600 text-gray-200 text-xs font-bold uppercase px-2 py-0.5 rounded';
@@ -96,7 +97,19 @@
 
 <div class="flex flex-col h-full">
   <div class="p-4 bg-gray-800">
-    <h2 class="text-lg font-semibold text-white">History</h2>
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-lg font-semibold text-white">History</h2>
+      {#if !databaseStatus.connected}
+        <span class="text-xs text-red-400 bg-red-900 px-2 py-1 rounded" title={databaseStatus.message}>
+          ⚠️ DB
+        </span>
+      {/if}
+    </div>
+    {#if !databaseStatus.connected}
+      <div class="text-xs text-red-300 bg-red-900/20 p-2 rounded border border-red-800">
+        {databaseStatus.message}
+      </div>
+    {/if}
   </div>
   
   <div class="flex-1 overflow-y-auto">

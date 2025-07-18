@@ -11,3 +11,5 @@ export function GetRequestByID(arg1:number):Promise<main.HistoryItem>;
 export function GetResponseByID(arg1:number):Promise<main.ResponseData>;
 
 export function ParseCurlCommand(arg1:string):Promise<main.RequestData>;
+
+export function TestDatabaseConnection():Promise<boolean|string>;

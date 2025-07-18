@@ -26,21 +26,69 @@
   // History data
   let history = [];
   let loading = false;
+  let databaseStatus = { connected: true, message: 'Initializing...' };
 
   // Load history on startup
   async function loadHistory() {
     try {
       console.log('Loading history...');
-      history = await GetHistory(50); // Get last 50 requests
+      const historyResult = await GetHistory(50); // Get last 50 requests
+      
+      // Handle case where GetHistory returns null
+      if (historyResult === null) {
+        console.log('GetHistory returned null, retrying in 1 second...');
+        // Retry once after a short delay in case database is still initializing
+        setTimeout(async () => {
+          try {
+            const retryResult = await GetHistory(50);
+            if (retryResult === null) {
+              history = [];
+              databaseStatus = { connected: false, message: 'Database not available' };
+            } else {
+              history = retryResult;
+              databaseStatus = { connected: true, message: `Database ready (${history.length} items)` };
+            }
+          } catch (retryError) {
+            console.error('Retry failed:', retryError);
+            history = [];
+            databaseStatus = { connected: false, message: `Database error: ${retryError.message}` };
+          }
+        }, 1000);
+        return;
+      }
+      
+      history = historyResult;
       console.log('History loaded:', history);
+      
+      // Check if database is working by seeing if we get a proper response
+      if (history.length === 0) {
+        databaseStatus = { connected: true, message: 'Database ready (no history yet)' };
+      } else {
+        databaseStatus = { connected: true, message: `Database ready (${history.length} items)` };
+      }
     } catch (error) {
       console.error('Failed to load history:', error);
       history = [];
+      databaseStatus = { connected: false, message: `Database error: ${error.message}` };
     }
   }
 
   // Load history when component mounts
-  loadHistory();
+  import { onMount } from 'svelte';
+  
+  onMount(() => {
+    console.log('Component mounted, adding paste listener');
+    document.addEventListener('paste', handlePaste);
+    
+    // Add a small delay to ensure database is initialized
+    setTimeout(() => {
+      loadHistory();
+    }, 500);
+    
+    return () => {
+      document.removeEventListener('paste', handlePaste);
+    };
+  });
 
   async function handleSendRequest() {
     console.log('Send Request clicked!');
@@ -96,6 +144,8 @@
       if (history.length > 0) {
         selectedHistoryItem = history[0].id;
         console.log('Auto-selected new history item:', selectedHistoryItem);
+        // Update database status to show it's working
+        databaseStatus = { connected: true, message: `Database ready (${history.length} items)` };
       }
     } catch (error) {
       console.error('Request failed:', error);
@@ -210,18 +260,6 @@
       }
     }
   }
-
-  // Add paste event listener to the document when component mounts
-  import { onMount } from 'svelte';
-  
-  onMount(() => {
-    console.log('Component mounted, adding paste listener');
-    document.addEventListener('paste', handlePaste);
-    
-    return () => {
-      document.removeEventListener('paste', handlePaste);
-    };
-  });
 </script>
 
 <main class="h-screen flex flex-col bg-gray-900">
@@ -232,6 +270,7 @@
       <HistoryPane 
         {history}
         {selectedHistoryItem}
+        {databaseStatus}
         onSelectHistoryItem={handleSelectHistoryItem}
       />
     </div>

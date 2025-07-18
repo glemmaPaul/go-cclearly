@@ -1,4 +1,9 @@
 # README
+![](./docs/screenshot.png)
+
+A small footprint, local only cURL inspector, simply copy and paste the cUrl in and inspect your requests and responses.
+
+This is a simple side project of mine, issues and features are absolutely welcome, though I do have limited time on this project!
 
 ## About
 

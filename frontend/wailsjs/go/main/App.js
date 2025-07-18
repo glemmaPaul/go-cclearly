@@ -21,3 +21,7 @@ export function GetResponseByID(arg1) {
 export function ParseCurlCommand(arg1) {
   return window['go']['main']['App']['ParseCurlCommand'](arg1);
 }
+
+export function TestDatabaseConnection() {
+  return window['go']['main']['App']['TestDatabaseConnection']();
+}

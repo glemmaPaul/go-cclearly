@@ -34,9 +34,11 @@ func (a *App) startup(ctx context.Context) {
 	database, err := NewDatabase(dbPath)
 	if err != nil {
 		log.Printf("Failed to initialize database: %v", err)
-		return
+		// Don't return - continue without database for now
+		// The app can still work for making requests, just without history
+	} else {
+		a.database = database
 	}
-	a.database = database
 }
 
 // shutdown is called when the app shuts down
@@ -78,10 +80,35 @@ func (a *App) ParseCurlCommand(curlCmd string) (*RequestData, error) {
 // GetHistory retrieves the request history
 func (a *App) GetHistory(limit int) ([]HistoryItem, error) {
 	if a.database == nil {
-		return []HistoryItem{}, nil
+		return make([]HistoryItem, 0), nil
 	}
 
-	return a.database.GetHistory(limit)
+	history, err := a.database.GetHistory(limit)
+	if err != nil {
+		return make([]HistoryItem, 0), err
+	}
+
+	// Ensure we always return a proper slice, not nil
+	if history == nil {
+		history = make([]HistoryItem, 0)
+	}
+
+	return history, nil
+}
+
+// TestDatabaseConnection tests if the database is working
+func (a *App) TestDatabaseConnection() (bool, string) {
+	if a.database == nil {
+		return false, "Database not initialized"
+	}
+
+	// Try a simple query to test the connection
+	_, err := a.database.GetHistory(1)
+	if err != nil {
+		return false, fmt.Sprintf("Database test failed: %v", err)
+	}
+
+	return true, "Database connection successful"
 }
 
 // GetRequestByID retrieves a specific request by ID

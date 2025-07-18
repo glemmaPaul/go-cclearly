@@ -78,7 +78,7 @@ func (d *Database) GetHistory(limit int) ([]HistoryItem, error) {
 
 	rows, err := d.db.Query(query, limit)
 	if err != nil {
-		return nil, err
+		return make([]HistoryItem, 0), err
 	}
 	defer rows.Close()
 
@@ -87,9 +87,14 @@ func (d *Database) GetHistory(limit int) ([]HistoryItem, error) {
 		var item HistoryItem
 		err := rows.Scan(&item.ID, &item.Method, &item.URL, &item.FullCommand, &item.StatusCode, &item.ResponseBody, &item.ResponseHeaders, &item.ResponseType, &item.CreatedAt)
 		if err != nil {
-			return nil, err
+			return make([]HistoryItem, 0), err
 		}
 		history = append(history, item)
+	}
+
+	// Ensure we never return nil
+	if history == nil {
+		history = make([]HistoryItem, 0)
 	}
 
 	return history, nil
